@@ -1,4 +1,4 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from sqlalchemy.orm import Session
 from database import SessionLocal
 from models import Resource
@@ -32,3 +32,12 @@ def create_resource(resource: ResourceCreate):
     db.refresh(new_resource)
     db.close()
     return new_resource
+
+@app.get("/resources/{resource_id}")
+def get_resource(resource_id: int):
+    db = SessionLocal()
+    resource = db.query(Resource).filter(Resource.id == resource_id).first()
+    db.close()
+    if resource is None:
+        raise HTTPException(status_code=404, detail="Resource not found")
+    return resource
