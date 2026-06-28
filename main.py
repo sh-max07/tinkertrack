@@ -3,6 +3,8 @@ from sqlalchemy.orm import Session
 from database import SessionLocal
 from models import Resource
 from pydantic import BaseModel
+from datetime import datetime
+from models import Reservation
 
 app = FastAPI()
 
@@ -67,3 +69,38 @@ def update_resource(resource_id: int, updates: ResourceUpdate):
     db.refresh(resource)
     db.close()
     return resource
+
+class ReservationCreate(BaseModel):
+    user_id: int
+    resource_id: int
+    start_time: datetime
+    end_time: datetime
+
+@app.post("/reservations")
+def create_reservation(reservation: ReservationCreate):
+    db = SessionLocal()
+
+    conflict = db.query(Reservation).filter(
+        Reservation.resource_id == reservation.resource_id,
+        Reservation.status == "confirmed",
+        Reservation.start_time < reservation.end_time,
+        Reservation.end_time > reservation.start_time
+    ).first()
+
+    if conflict:
+        db.close()
+        raise HTTPException(status_code=409, detail="This time slot conflicts with an existing reservation")
+
+    new_reservation = Reservation(
+        user_id=reservation.user_id,
+        resource_id=reservation.resource_id,
+        start_time=reservation.start_time,
+        end_time=reservation.end_time,
+        status="confirmed"
+    )
+    db.add(new_reservation)
+    db.commit()
+    db.refresh(new_reservation)
+    db.close()
+    return new_reservation
+
