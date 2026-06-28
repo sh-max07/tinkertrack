@@ -41,3 +41,29 @@ def get_resource(resource_id: int):
     if resource is None:
         raise HTTPException(status_code=404, detail="Resource not found")
     return resource
+
+class ResourceUpdate(BaseModel):
+    name: str | None = None
+    description: str | None = None
+    category: str | None = None
+    status: str | None = None
+    operational_hours: str | None = None
+    max_capacity: int | None = None
+
+@app.patch("/resources/{resource_id}")
+def update_resource(resource_id: int, updates: ResourceUpdate):
+    db = SessionLocal()
+    resource = db.query(Resource).filter(Resource.id == resource_id).first()
+
+    if resource is None:
+        db.close()
+        raise HTTPException(status_code=404, detail="Resource not found")
+
+    update_data = updates.dict(exclude_unset=True)
+    for field, value in update_data.items():
+        setattr(resource, field, value)
+
+    db.commit()
+    db.refresh(resource)
+    db.close()
+    return resource

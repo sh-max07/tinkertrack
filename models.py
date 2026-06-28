@@ -23,6 +23,8 @@ class Resource(Base):
     description = Column(String)
     category = Column(String, nullable=False)
     status = Column(String, default="working")
+    operational_hours = Column(String)
+    max_capacity = Column(Integer)
 
 
 class Reservation(Base):
