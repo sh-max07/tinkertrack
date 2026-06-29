@@ -117,3 +117,22 @@ def get_all_reservations():
     reservations = db.query(Reservation).all()
     db.close()
     return reservations
+
+@app.patch("/reservations/{reservation_id}/cancel")
+def cancel_reservation(reservation_id: int, user_id: int):
+    db = SessionLocal()
+    reservation = db.query(Reservation).filter(Reservation.id == reservation_id).first()
+
+    if reservation is None:
+        db.close()
+        raise HTTPException(status_code=404, detail="Reservation not found")
+
+    if reservation.user_id != user_id:
+        db.close()
+        raise HTTPException(status_code=403, detail="You can only cancel your own reservations")
+
+    reservation.status = "cancelled"
+    db.commit()
+    db.refresh(reservation)
+    db.close()
+    return reservation
