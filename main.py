@@ -166,3 +166,35 @@ def signup(user: UserCreate):
     db.refresh(new_user)
     db.close()
     return {"id": new_user.id, "name": new_user.name, "email": new_user.email}
+
+from jose import jwt
+from datetime import datetime, timedelta
+
+SECRET_KEY = "your-secret-key-change-this-later"
+ALGORITHM = "HS256"
+
+class LoginRequest(BaseModel):
+    email: str
+    password: str
+
+@app.post("/login")
+def login(credentials: LoginRequest):
+    db = SessionLocal()
+    user = db.query(User).filter(User.email == credentials.email).first()
+    db.close()
+
+    if user is None:
+        raise HTTPException(status_code=401, detail="Invalid email or password")
+
+    if not pwd_context.verify(credentials.password, user.password):
+        raise HTTPException(status_code=401, detail="Invalid email or password")
+
+    token_data = {
+        "user_id": user.id,
+        "role": user.role,
+        "exp": datetime.utcnow() + timedelta(hours=24)
+    }
+    token = jwt.encode(token_data, SECRET_KEY, algorithm=ALGORITHM)
+
+    return {"access_token": token, "token_type": "bearer"}
+    
