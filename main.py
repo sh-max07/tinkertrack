@@ -104,3 +104,16 @@ def create_reservation(reservation: ReservationCreate):
     db.close()
     return new_reservation
 
+@app.get("/reservations")
+def get_my_reservations(user_id: int):
+    db = SessionLocal()
+    reservations = db.query(Reservation).filter(Reservation.user_id == user_id).all()
+    db.close()
+    return reservations
+
+@app.get("/reservations/all")
+def get_all_reservations():
+    db = SessionLocal()
+    reservations = db.query(Reservation).all()
+    db.close()
+    return reservations
