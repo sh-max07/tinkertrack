@@ -1,12 +1,31 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Depends
 from sqlalchemy.orm import Session
 from database import SessionLocal
 from models import Resource, Reservation, User
 from pydantic import BaseModel
 from datetime import datetime
 from passlib.context import CryptContext
+from jose import jwt
+from datetime import datetime, timedelta
+from fastapi.security import OAuth2PasswordBearer
 
 app = FastAPI()
+
+SECRET_KEY = "your-secret-key-change-this-later"
+ALGORITHM = "HS256"
+
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
+
+def get_current_user(token: str = Depends(oauth2_scheme)):
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        user_id = payload.get("user_id")
+        role = payload.get("role")
+        if user_id is None:
+            raise HTTPException(status_code=401, detail="Invalid token")
+        return {"user_id": user_id, "role": role}
+    except jwt.JWTError:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
 
 @app.get("/resources")
 def get_resources():
@@ -119,7 +138,7 @@ def get_all_reservations():
     return reservations
 
 @app.patch("/reservations/{reservation_id}/cancel")
-def cancel_reservation(reservation_id: int, user_id: int):
+def cancel_reservation(reservation_id: int, current_user: dict = Depends(get_current_user)):
     db = SessionLocal()
     reservation = db.query(Reservation).filter(Reservation.id == reservation_id).first()
 
@@ -127,7 +146,7 @@ def cancel_reservation(reservation_id: int, user_id: int):
         db.close()
         raise HTTPException(status_code=404, detail="Reservation not found")
 
-    if reservation.user_id != user_id:
+    if reservation.user_id != current_user["user_id"]:
         db.close()
         raise HTTPException(status_code=403, detail="You can only cancel your own reservations")
 
@@ -167,11 +186,7 @@ def signup(user: UserCreate):
     db.close()
     return {"id": new_user.id, "name": new_user.name, "email": new_user.email}
 
-from jose import jwt
-from datetime import datetime, timedelta
 
-SECRET_KEY = "your-secret-key-change-this-later"
-ALGORITHM = "HS256"
 
 class LoginRequest(BaseModel):
     email: str
@@ -197,4 +212,4 @@ def login(credentials: LoginRequest):
     token = jwt.encode(token_data, SECRET_KEY, algorithm=ALGORITHM)
 
     return {"access_token": token, "token_type": "bearer"}
-    
+
