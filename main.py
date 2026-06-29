@@ -1,10 +1,10 @@
 from fastapi import FastAPI, HTTPException
 from sqlalchemy.orm import Session
 from database import SessionLocal
-from models import Resource
+from models import Resource, Reservation, User
 from pydantic import BaseModel
 from datetime import datetime
-from models import Reservation
+from passlib.context import CryptContext
 
 app = FastAPI()
 
@@ -136,3 +136,33 @@ def cancel_reservation(reservation_id: int, user_id: int):
     db.refresh(reservation)
     db.close()
     return reservation
+
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+class UserCreate(BaseModel):
+    name: str
+    email: str
+    password: str
+
+@app.post("/signup")
+def signup(user: UserCreate):
+    db = SessionLocal()
+
+    existing_user = db.query(User).filter(User.email == user.email).first()
+    if existing_user:
+        db.close()
+        raise HTTPException(status_code=400, detail="Email already registered")
+
+    hashed_password = pwd_context.hash(user.password)
+
+    new_user = User(
+        name=user.name,
+        email=user.email,
+        password=hashed_password,
+        role="user"
+    )
+    db.add(new_user)
+    db.commit()
+    db.refresh(new_user)
+    db.close()
+    return {"id": new_user.id, "name": new_user.name, "email": new_user.email}
