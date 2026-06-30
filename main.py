@@ -27,10 +27,12 @@ def get_current_user(token: str = Depends(oauth2_scheme)):
     except jwt.JWTError:
         raise HTTPException(status_code=401, detail="Invalid or expired token")
 
+
 def get_current_admin(current_user: dict = Depends(get_current_user)):
     if current_user["role"] != "admin":
         raise HTTPException(status_code=403, detail="Admin access required")
     return current_user
+
 
 @app.get("/resources")
 def get_resources():
@@ -39,10 +41,12 @@ def get_resources():
     db.close()
     return resources
 
+
 class ResourceCreate(BaseModel):
     name: str
     description: str | None = None
     category: str
+
 
 @app.post("/resources")
 def create_resource(resource: ResourceCreate, current_admin: dict = Depends(get_current_admin)):
@@ -59,6 +63,7 @@ def create_resource(resource: ResourceCreate, current_admin: dict = Depends(get_
     db.close()
     return new_resource
 
+
 @app.get("/resources/{resource_id}")
 def get_resource(resource_id: int):
     db = SessionLocal()
@@ -68,6 +73,7 @@ def get_resource(resource_id: int):
         raise HTTPException(status_code=404, detail="Resource not found")
     return resource
 
+
 class ResourceUpdate(BaseModel):
     name: str | None = None
     description: str | None = None
@@ -75,6 +81,7 @@ class ResourceUpdate(BaseModel):
     status: str | None = None
     operational_hours: str | None = None
     max_capacity: int | None = None
+
 
 @app.patch("/resources/{resource_id}")
 def update_resource(resource_id: int, updates: ResourceUpdate, current_admin: dict = Depends(get_current_admin)):
@@ -94,14 +101,15 @@ def update_resource(resource_id: int, updates: ResourceUpdate, current_admin: di
     db.close()
     return resource
 
+
 class ReservationCreate(BaseModel):
-    user_id: int
     resource_id: int
     start_time: datetime
     end_time: datetime
 
+
 @app.post("/reservations")
-def create_reservation(reservation: ReservationCreate):
+def create_reservation(reservation: ReservationCreate, current_user: dict = Depends(get_current_user)):
     db = SessionLocal()
 
     conflict = db.query(Reservation).filter(
@@ -116,7 +124,7 @@ def create_reservation(reservation: ReservationCreate):
         raise HTTPException(status_code=409, detail="This time slot conflicts with an existing reservation")
 
     new_reservation = Reservation(
-        user_id=reservation.user_id,
+        user_id=current_user["user_id"],
         resource_id=reservation.resource_id,
         start_time=reservation.start_time,
         end_time=reservation.end_time,
@@ -128,19 +136,22 @@ def create_reservation(reservation: ReservationCreate):
     db.close()
     return new_reservation
 
+
 @app.get("/reservations")
-def get_my_reservations(user_id: int):
+def get_my_reservations(current_user: dict = Depends(get_current_user)):
     db = SessionLocal()
-    reservations = db.query(Reservation).filter(Reservation.user_id == user_id).all()
+    reservations = db.query(Reservation).filter(Reservation.user_id == current_user["user_id"]).all()
     db.close()
     return reservations
 
+
 @app.get("/reservations/all")
-def get_all_reservations():
+def get_all_reservations(current_admin: dict = Depends(get_current_admin)):
     db = SessionLocal()
     reservations = db.query(Reservation).all()
     db.close()
     return reservations
+
 
 @app.patch("/reservations/{reservation_id}/cancel")
 def cancel_reservation(reservation_id: int, current_user: dict = Depends(get_current_user)):
@@ -161,12 +172,14 @@ def cancel_reservation(reservation_id: int, current_user: dict = Depends(get_cur
     db.close()
     return reservation
 
+
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 class UserCreate(BaseModel):
     name: str
     email: str
     password: str
+
 
 @app.post("/signup")
 def signup(user: UserCreate):
@@ -195,6 +208,7 @@ def signup(user: UserCreate):
 class LoginRequest(BaseModel):
     email: str
     password: str
+    
 
 @app.post("/login")
 def login(credentials: LoginRequest):
@@ -216,4 +230,5 @@ def login(credentials: LoginRequest):
     token = jwt.encode(token_data, SECRET_KEY, algorithm=ALGORITHM)
 
     return {"access_token": token, "token_type": "bearer"}
+
 
