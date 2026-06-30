@@ -27,6 +27,11 @@ def get_current_user(token: str = Depends(oauth2_scheme)):
     except jwt.JWTError:
         raise HTTPException(status_code=401, detail="Invalid or expired token")
 
+def get_current_admin(current_user: dict = Depends(get_current_user)):
+    if current_user["role"] != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+    return current_user
+
 @app.get("/resources")
 def get_resources():
     db = SessionLocal()
@@ -40,7 +45,7 @@ class ResourceCreate(BaseModel):
     category: str
 
 @app.post("/resources")
-def create_resource(resource: ResourceCreate):
+def create_resource(resource: ResourceCreate, current_admin: dict = Depends(get_current_admin)):
     db = SessionLocal()
     new_resource = Resource(
         name=resource.name,
@@ -72,7 +77,7 @@ class ResourceUpdate(BaseModel):
     max_capacity: int | None = None
 
 @app.patch("/resources/{resource_id}")
-def update_resource(resource_id: int, updates: ResourceUpdate):
+def update_resource(resource_id: int, updates: ResourceUpdate, current_admin: dict = Depends(get_current_admin)):
     db = SessionLocal()
     resource = db.query(Resource).filter(Resource.id == resource_id).first()
 
@@ -185,7 +190,6 @@ def signup(user: UserCreate):
     db.refresh(new_user)
     db.close()
     return {"id": new_user.id, "name": new_user.name, "email": new_user.email}
-
 
 
 class LoginRequest(BaseModel):
